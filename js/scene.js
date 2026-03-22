@@ -6,7 +6,9 @@ import { clock, dom, state } from "./state.js";
 import { updateHandTracking } from "./tracker.js";
 
 export let scene, cam, renderer, composer;
+let neonGroup, sunGroup;
 let outerSphere, wireSphere, core, core2, glowShell, glowShell2, ringParticles, ring2, ring3, energyParticles, stars;
+let sunSphere, sunCorona, sunRings, sunParticles;
 let mainLight, purpleLight, pinkLight, extraLight1, extraLight2;
 
 const ringCount = 200;
@@ -14,6 +16,7 @@ const ring2Count = 150;
 const ring3Count = 100;
 const energyCount = 400;
 const starCount = 3000;
+const sunRingCount = 12000;
 
 let ringAngles = new Float32Array(ringCount);
 let ringRadii = new Float32Array(ringCount);
@@ -94,9 +97,14 @@ export function setupScene() {
     stars = new THREE.Points(starsGeo, starsMat);
     scene.add(stars);
 
-    /* ── Main sphere group ── */
-    const sphereGroup = new THREE.Group();
-    scene.add(sphereGroup);
+    /* ── Main sphere groups ── */
+    neonGroup = new THREE.Group();
+    sunGroup = new THREE.Group();
+    scene.add(neonGroup);
+    scene.add(sunGroup);
+    sunGroup.visible = false;
+
+    /* ══════════════════════ NEON MODE ══════════════════════ */
 
     /* ── Outer glass sphere ── */
     outerSphere = new THREE.Mesh(
@@ -115,7 +123,7 @@ export function setupScene() {
             envMapIntensity: 1.5,
         })
     );
-    sphereGroup.add(outerSphere);
+    neonGroup.add(outerSphere);
 
     /* ── Wireframe sphere ── */
     const wireGeo = new THREE.IcosahedronGeometry(1.85, 3);
@@ -126,7 +134,7 @@ export function setupScene() {
         opacity: 0.35,
     });
     wireSphere = new THREE.Mesh(wireGeo, wireMat);
-    sphereGroup.add(wireSphere);
+    neonGroup.add(wireSphere);
 
     /* ── Inner core glow ── */
     const coreMat = new THREE.MeshBasicMaterial({
@@ -135,7 +143,7 @@ export function setupScene() {
         opacity: 1.0,
     });
     core = new THREE.Mesh(new THREE.SphereGeometry(0.55, 32, 32), coreMat);
-    sphereGroup.add(core);
+    neonGroup.add(core);
 
     /* ── Outer glow shell ── */
     glowShell = new THREE.Mesh(
@@ -147,7 +155,7 @@ export function setupScene() {
             side: THREE.BackSide
         })
     );
-    sphereGroup.add(glowShell);
+    neonGroup.add(glowShell);
 
     glowShell2 = new THREE.Mesh(
         new THREE.SphereGeometry(2.5, 48, 48),
@@ -158,7 +166,7 @@ export function setupScene() {
             side: THREE.BackSide
         })
     );
-    sphereGroup.add(glowShell2);
+    neonGroup.add(glowShell2);
 
     /* ── Inner core 2 ── */
     core2 = new THREE.Mesh(
@@ -169,7 +177,7 @@ export function setupScene() {
             opacity: 0.45,
         })
     );
-    sphereGroup.add(core2);
+    neonGroup.add(core2);
 
     /* ── Orbiting ring particles ── */
     const ringGeo = new THREE.BufferGeometry();
@@ -192,7 +200,7 @@ export function setupScene() {
         sizeAttenuation: true,
     });
     ringParticles = new THREE.Points(ringGeo, ringMat);
-    sphereGroup.add(ringParticles);
+    neonGroup.add(ringParticles);
 
     /* ── Second ring (tilted) ── */
     const ring2Geo = new THREE.BufferGeometry();
@@ -214,7 +222,7 @@ export function setupScene() {
     }));
     ring2.rotation.x = Math.PI * 0.35;
     ring2.rotation.z = Math.PI * 0.15;
-    sphereGroup.add(ring2);
+    neonGroup.add(ring2);
 
     /* ── Third ring (yellow, vertical) ── */
     const ring3Geo = new THREE.BufferGeometry();
@@ -236,7 +244,7 @@ export function setupScene() {
     }));
     ring3.rotation.x = Math.PI * 0.5;
     ring3.rotation.y = Math.PI * 0.25;
-    sphereGroup.add(ring3);
+    neonGroup.add(ring3);
 
     /* ── Floating energy particles around sphere ── */
     const energyGeo = new THREE.BufferGeometry();
@@ -264,14 +272,89 @@ export function setupScene() {
         opacity: 0.9,
         sizeAttenuation: true,
     }));
-    sphereGroup.add(energyParticles);
+    neonGroup.add(energyParticles);
 
-    return sphereGroup;
+    /* ══════════════════════ GOLDEN SUN MODE ══════════════════════ */
+
+    // Main Sun Sphere
+    sunSphere = new THREE.Mesh(
+        new THREE.SphereGeometry(1.6, 64, 64),
+        new THREE.MeshStandardMaterial({
+            color: 0xffaa00,
+            emissive: 0xff6600,
+            emissiveIntensity: 2,
+            roughness: 0.4,
+            metalness: 0.2
+        })
+    );
+    sunGroup.add(sunSphere);
+
+    // Sun Corona/Glow
+    sunCorona = new THREE.Mesh(
+        new THREE.SphereGeometry(1.8, 48, 48),
+        new THREE.MeshBasicMaterial({
+            color: 0xffcc00,
+            transparent: true,
+            opacity: 0.12,
+            side: THREE.BackSide
+        })
+    );
+    sunGroup.add(sunCorona);
+
+    // Massive Flat Rings (Saturn style)
+    const sunRingGeo = new THREE.BufferGeometry();
+    const sunRingPos = new Float32Array(sunRingCount * 3);
+    for (let i = 0; i < sunRingCount; i++) {
+        const r = 2.4 + Math.random() * 2.8;
+        const a = Math.random() * Math.PI * 2;
+        sunRingPos[i * 3] = Math.cos(a) * r;
+        sunRingPos[i * 3 + 1] = (Math.random() - 0.5) * 0.15;
+        sunRingPos[i * 3 + 2] = Math.sin(a) * r;
+    }
+    sunRingGeo.setAttribute("position", new THREE.BufferAttribute(sunRingPos, 3));
+    sunRings = new THREE.Points(sunRingGeo, new THREE.PointsMaterial({
+        color: 0xffddaa,
+        size: 0.035,
+        transparent: true,
+        opacity: 0.4,
+        sizeAttenuation: true
+    }));
+    sunGroup.add(sunRings);
+
+    // Sun Surface Dust
+    const sunDustGeo = new THREE.IcosahedronGeometry(1.7, 4);
+    sunParticles = new THREE.Points(sunDustGeo, new THREE.PointsMaterial({
+        color: 0xffff00,
+        size: 0.05,
+        transparent: true,
+        opacity: 0.8
+    }));
+    sunGroup.add(sunParticles);
+
+    return { neonGroup, sunGroup };
 }
 
-export function animateScene(sphereGroup) {
+export function animateScene(groups) {
+    const { neonGroup, sunGroup } = groups;
     const t = clock.getElapsedTime();
     updateHandTracking();
+
+    // Toggle Groups based on state
+    if (state.currentMode === "neon") {
+        neonGroup.visible = true;
+        sunGroup.visible = false;
+        mainLight.color.setHex(0x00ffcc);
+        pinkLight.color.setHex(0xffff00);
+        renderer.setClearColor(0x030012);
+    } else {
+        neonGroup.visible = false;
+        sunGroup.visible = true;
+        mainLight.color.setHex(0xffaa00);
+        pinkLight.color.setHex(0xffaa00);
+        renderer.setClearColor(0x0a0500);
+    }
+
+    const activeGroup = state.currentMode === "neon" ? neonGroup : sunGroup;
 
     // Smooth interpolation
     const lerpSpeed = 0.07;
@@ -281,77 +364,91 @@ export function animateScene(sphereGroup) {
     state.currentRotY = THREE.MathUtils.lerp(state.currentRotY, state.targetRotY, lerpSpeed);
     state.interactionScale = THREE.MathUtils.lerp(state.interactionScale, state.targetScale, 0.05);
 
-    // Apply to sphere group
-    sphereGroup.position.x = state.currentX;
-    sphereGroup.position.y = state.currentY;
-    sphereGroup.rotation.x = state.currentRotX;
+    // Apply to active group
+    activeGroup.position.x = state.currentX;
+    activeGroup.position.y = state.currentY;
+    activeGroup.rotation.x = state.currentRotX;
 
     // Globe rotation: hand left/right spins the globe continuously
     state.globeSpinSpeed *= 0.96; // friction
-    sphereGroup.rotation.y += state.globeSpinSpeed + 0.003;
-    sphereGroup.scale.setScalar(state.interactionScale);
+    activeGroup.rotation.y += state.globeSpinSpeed + 0.003;
+    activeGroup.scale.setScalar(state.interactionScale);
 
-    // Idle rotation
-    outerSphere.rotation.y += 0.003;
-    outerSphere.rotation.x += 0.001;
-    wireSphere.rotation.y -= 0.005;
-    wireSphere.rotation.z += 0.002;
+    if (state.currentMode === "neon") {
+        // Idle rotation
+        outerSphere.rotation.y += 0.003;
+        outerSphere.rotation.x += 0.001;
+        wireSphere.rotation.y -= 0.005;
+        wireSphere.rotation.z += 0.002;
 
-    // Pulsing core - intense
-    const pulse = 0.8 + Math.sin(t * 2.5) * 0.2;
-    core.material.opacity = pulse;
-    core.scale.setScalar(1 + Math.sin(t * 3) * 0.15);
-    core2.rotation.y += 0.015;
-    core2.rotation.x -= 0.01;
-    core2.scale.setScalar(1 + Math.sin(t * 1.8) * 0.1);
+        // Pulsing core - intense
+        const pulse = 0.8 + Math.sin(t * 2.5) * 0.2;
+        core.material.opacity = pulse;
+        core.scale.setScalar(1 + Math.sin(t * 3) * 0.15);
+        core2.rotation.y += 0.015;
+        core2.rotation.x -= 0.01;
+        core2.scale.setScalar(1 + Math.sin(t * 1.8) * 0.1);
 
-    // Glow shell pulse
-    glowShell.material.opacity = 0.06 + Math.sin(t * 1.5) * 0.04;
-    glowShell.scale.setScalar(1 + Math.sin(t * 2) * 0.05);
-    glowShell2.material.opacity = 0.03 + Math.sin(t * 1.2 + 1) * 0.02;
+        // Glow shell pulse
+        glowShell.material.opacity = 0.06 + Math.sin(t * 1.5) * 0.04;
+        glowShell.scale.setScalar(1 + Math.sin(t * 2) * 0.05);
+        glowShell2.material.opacity = 0.03 + Math.sin(t * 1.2 + 1) * 0.02;
 
-    // Animate ring particles
-    const positions = ringParticles.geometry.attributes.position.array;
-    for (let i = 0; i < ringCount; i++) {
-        ringAngles[i] += 0.008;
-        const wobble = Math.sin(t * 2 + i * 0.3) * 0.08;
-        positions[i * 3] = Math.cos(ringAngles[i]) * (ringRadii[i] + wobble);
-        positions[i * 3 + 1] = ringOffsets[i] + Math.sin(t * 1.5 + i * 0.2) * 0.15;
-        positions[i * 3 + 2] = Math.sin(ringAngles[i]) * (ringRadii[i] + wobble);
+        // Animate ring particles
+        const positions = ringParticles.geometry.attributes.position.array;
+        for (let i = 0; i < ringCount; i++) {
+            ringAngles[i] += 0.008;
+            const wobble = Math.sin(t * 2 + i * 0.3) * 0.08;
+            positions[i * 3] = Math.cos(ringAngles[i]) * (ringRadii[i] + wobble);
+            positions[i * 3 + 1] = ringOffsets[i] + Math.sin(t * 1.5 + i * 0.2) * 0.15;
+            positions[i * 3 + 2] = Math.sin(ringAngles[i]) * (ringRadii[i] + wobble);
+        }
+        ringParticles.geometry.attributes.position.needsUpdate = true;
+
+        // Animate ring2
+        const positions2 = ring2.geometry.attributes.position.array;
+        for (let i = 0; i < ring2Count; i++) {
+            ring2Angles[i] -= 0.005;
+            positions2[i * 3] = Math.cos(ring2Angles[i]) * ring2Radii[i];
+            positions2[i * 3 + 1] = Math.sin(ring2Angles[i]) * 0.15 + Math.sin(t + i * 0.4) * 0.1;
+            positions2[i * 3 + 2] = Math.sin(ring2Angles[i]) * ring2Radii[i];
+        }
+        ring2.geometry.attributes.position.needsUpdate = true;
+
+        // Animate ring3
+        const positions3 = ring3.geometry.attributes.position.array;
+        for (let i = 0; i < ring3Count; i++) {
+            ring3Angles[i] += 0.006;
+            positions3[i * 3] = Math.cos(ring3Angles[i]) * ring3Radii[i];
+            positions3[i * 3 + 1] = Math.sin(ring3Angles[i]) * ring3Radii[i] * 0.1 + Math.sin(t * 1.2 + i * 0.3) * 0.12;
+            positions3[i * 3 + 2] = Math.sin(ring3Angles[i]) * ring3Radii[i];
+        }
+        ring3.geometry.attributes.position.needsUpdate = true;
+
+        // Animate energy particles
+        const ePos = energyParticles.geometry.attributes.position.array;
+        for (let i = 0; i < energyCount; i++) {
+            const s = energySpeeds[i];
+            s.theta += s.speed;
+            const rNow = s.r + Math.sin(t * 0.8 + s.offset) * 0.3;
+            ePos[i * 3] = rNow * Math.sin(s.phi) * Math.cos(s.theta);
+            ePos[i * 3 + 1] = rNow * Math.sin(s.phi) * Math.sin(s.theta);
+            ePos[i * 3 + 2] = rNow * Math.cos(s.phi);
+        }
+        energyParticles.geometry.attributes.position.needsUpdate = true;
+
+        // Wireframe opacity reacts to hand
+        wireSphere.material.opacity = state.handDetected ? 0.5 : 0.35;
+        ringParticles.material.opacity = state.handDetected ? 1.0 : 0.9;
+    } else {
+        // Sun animations
+        sunSphere.rotation.y += 0.008;
+        sunParticles.rotation.y -= 0.012;
+        sunRings.rotation.y += 0.002;
+
+        sunSphere.scale.setScalar(1 + Math.sin(t * 4) * 0.03);
+        sunCorona.material.opacity = 0.12 + Math.sin(t * 2) * 0.05;
     }
-    ringParticles.geometry.attributes.position.needsUpdate = true;
-
-    // Animate ring2
-    const positions2 = ring2.geometry.attributes.position.array;
-    for (let i = 0; i < ring2Count; i++) {
-        ring2Angles[i] -= 0.005;
-        positions2[i * 3] = Math.cos(ring2Angles[i]) * ring2Radii[i];
-        positions2[i * 3 + 1] = Math.sin(ring2Angles[i]) * 0.15 + Math.sin(t + i * 0.4) * 0.1;
-        positions2[i * 3 + 2] = Math.sin(ring2Angles[i]) * ring2Radii[i];
-    }
-    ring2.geometry.attributes.position.needsUpdate = true;
-
-    // Animate ring3
-    const positions3 = ring3.geometry.attributes.position.array;
-    for (let i = 0; i < ring3Count; i++) {
-        ring3Angles[i] += 0.006;
-        positions3[i * 3] = Math.cos(ring3Angles[i]) * ring3Radii[i];
-        positions3[i * 3 + 1] = Math.sin(ring3Angles[i]) * ring3Radii[i] * 0.1 + Math.sin(t * 1.2 + i * 0.3) * 0.12;
-        positions3[i * 3 + 2] = Math.sin(ring3Angles[i]) * ring3Radii[i];
-    }
-    ring3.geometry.attributes.position.needsUpdate = true;
-
-    // Animate energy particles
-    const ePos = energyParticles.geometry.attributes.position.array;
-    for (let i = 0; i < energyCount; i++) {
-        const s = energySpeeds[i];
-        s.theta += s.speed;
-        const rNow = s.r + Math.sin(t * 0.8 + s.offset) * 0.3;
-        ePos[i * 3] = rNow * Math.sin(s.phi) * Math.cos(s.theta);
-        ePos[i * 3 + 1] = rNow * Math.sin(s.phi) * Math.sin(s.theta);
-        ePos[i * 3 + 2] = rNow * Math.cos(s.phi);
-    }
-    energyParticles.geometry.attributes.position.needsUpdate = true;
 
     // Slowly rotate stars
     stars.rotation.y += 0.0002;
@@ -363,10 +460,6 @@ export function animateScene(sphereGroup) {
     purpleLight.position.y = -3 + Math.sin(t * 0.4) * 2;
     extraLight1.position.x = 3 + Math.sin(t * 0.6) * 3;
     extraLight2.position.z = -4 + Math.cos(t * 0.45) * 3;
-
-    // Wireframe opacity reacts to hand
-    wireSphere.material.opacity = state.handDetected ? 0.5 : 0.35;
-    ringParticles.material.opacity = state.handDetected ? 1.0 : 0.9;
 
     composer.render();
 }

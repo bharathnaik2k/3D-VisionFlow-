@@ -14,6 +14,7 @@ export const state = {
   targetScale: 1,
   globeSpinSpeed: 0,
   prevHandX: 0.5,
+  currentMode: "neon", // "neon" or "sun"
 };
 
 export const clock = new THREE.Clock();
@@ -25,6 +26,8 @@ export const dom = {
   errorEl: document.getElementById("error"),
   handIndicator: document.getElementById("handIndicator"),
   coordsDisplay: document.getElementById("coordsDisplay"),
+  btnNeon: document.getElementById("mode-neon"),
+  btnSun: document.getElementById("mode-sun"),
 };
 
 export function showError(msg) {

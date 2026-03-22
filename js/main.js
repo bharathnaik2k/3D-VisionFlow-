@@ -1,21 +1,33 @@
 import { setupCamera } from "./camera.js";
 import { animateScene, handleResize, setupScene } from "./scene.js";
-import { showError } from "./state.js";
+import { dom, showError, state } from "./state.js";
 import { enableMouseFallback, setupHandTracker } from "./tracker.js";
 
 async function init() {
     try {
-        const sphereGroup = setupScene();
+        const sphereGroups = setupScene();
 
         // Start animation loop
         function animate() {
             requestAnimationFrame(animate);
-            animateScene(sphereGroup);
+            animateScene(sphereGroups);
         }
         animate();
 
         // Setup interactions
         window.addEventListener("resize", handleResize);
+
+        // Mode Switching
+        dom.btnNeon.addEventListener("click", () => {
+            state.currentMode = "neon";
+            dom.btnNeon.classList.add("active");
+            dom.btnSun.classList.remove("active");
+        });
+        dom.btnSun.addEventListener("click", () => {
+            state.currentMode = "sun";
+            dom.btnSun.classList.add("active");
+            dom.btnNeon.classList.remove("active");
+        });
 
         // Setup camera and tracking
         try {
